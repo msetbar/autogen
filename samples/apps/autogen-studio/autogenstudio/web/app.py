@@ -21,6 +21,17 @@ from ..utils import check_and_cast_datetime_fields, init_app_folders, md5_hash, 
 from ..version import VERSION
 from ..websocket_connection_manager import WebSocketConnectionManager
 
+
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry import trace
+from azure.monitor.opentelemetry.exporter import AzureMonitorTraceExporter
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+import json
+import autogen.runtime_logging
+
+autogen.runtime_logging.start(logger_type=os.environ.get("LOGGER_TYPE"), config={})
+
 profiler = Profiler()
 managers = {"chat": None}  # manage calls to autogen
 # Create thread-safe queue for messages between api thread and autogen threads
@@ -455,16 +466,26 @@ async def run_session_workflow(message: Message, session_id: int, workflow_id: i
         dbmanager.upsert(message)
         user_dir = os.path.join(folders["files_static_root"], "user", md5_hash(message.user_id))
         os.makedirs(user_dir, exist_ok=True)
-        workflow = workflow_from_id(workflow_id, dbmanager=dbmanager)
-        agent_response: Message = await managers["chat"].a_chat(
-            message=message,
-            history=user_message_history,
-            user_dir=user_dir,
-            workflow=workflow,
-            connection_id=message.connection_id,
-        )
+        
+        with autogen.runtime_logging.autogen_logger.tracer.start_as_current_span(
+                "workflow_run") as current_span:
+            workflow = workflow_from_id(workflow_id, dbmanager=dbmanager)
+            agent_response: Message = managers["chat"].chat(
+                message=message,
+                history=user_message_history,
+                user_dir=user_dir,
+                workflow=workflow,
+                connection_id=message.connection_id,
+            )
 
-        response: Response = dbmanager.upsert(agent_response)
+            response: Response = dbmanager.upsert(agent_response)
+            current_span.set_attribute("user_id", message.user_id)
+            current_span.set_attribute("session_id", message.session_id)
+            current_span.set_attribute("workflow_id", workflow_id)
+            current_span.set_attribute("connection_id", message.connection_id)
+            json_dict = response.model_dump(mode="json")
+            current_span.set_attribute(
+                "messages", json.dumps(json_dict["data"]["meta"]))
         return response.model_dump(mode="json")
     except Exception as ex_error:
         return {

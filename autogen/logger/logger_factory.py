@@ -3,6 +3,7 @@ from typing import Any, Dict, Literal, Optional
 from autogen.logger.base_logger import BaseLogger
 from autogen.logger.file_logger import FileLogger
 from autogen.logger.sqlite_logger import SqliteLogger
+from autogen.logger.otel_logger import OtelLogger
 
 __all__ = ("LoggerFactory",)
 
@@ -19,5 +20,7 @@ class LoggerFactory:
             return SqliteLogger(config)
         elif logger_type == "file":
             return FileLogger(config)
+        elif logger_type == "otel":
+            return OtelLogger(config)
         else:
             raise ValueError(f"[logger_factory] Unknown logger type: {logger_type}")

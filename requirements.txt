@@ -1,0 +1,7 @@
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-instrumentation
+azure-monitor-opentelemetry
+azure-monitor-opentelemetry-exporter
+opentelemetry-exporter-otlp-proto-http
+opentelemetry-exporter-otlp-proto-grpc

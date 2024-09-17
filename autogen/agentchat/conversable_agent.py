@@ -2047,18 +2047,22 @@ class ConversableAgent(LLMAgent):
             if inspect.iscoroutinefunction(reply_func):
                 continue
             if self._match_trigger(reply_func_tuple["trigger"], sender):
+                from datetime import datetime
+                start_time = str(datetime.utcnow())
                 final, reply = reply_func(self, messages=messages, sender=sender, config=reply_func_tuple["config"])
                 if logging_enabled():
                     log_event(
                         self,
-                        "reply_func_executed",
+                        reply_func.__name__,
                         reply_func_module=reply_func.__module__,
                         reply_func_name=reply_func.__name__,
                         final=final,
                         reply=reply,
+                        start_time = start_time
                     )
                 if final:
                     return reply
+                print(f"Reply function {reply_func.__name__} did not return a final reply.")
         return self._default_auto_reply
 
     async def a_generate_reply(

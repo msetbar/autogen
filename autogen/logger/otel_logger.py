@@ -216,6 +216,11 @@ class OtelLogger(BaseLogger):
 
         if isinstance(source, Agent):
             try:
+                start_time = kwargs.get("start_time", None)
+                if start_time is not None:
+                    start_time_stamp = datetime.strptime(
+                        start_time, "%Y-%m-%d %H:%M:%S.%f")
+                    start_time =int(start_time_stamp.timestamp() * 1e9)
                 log_data = json.dumps(
                     {
                         "source_id": id(source),
@@ -229,7 +234,7 @@ class OtelLogger(BaseLogger):
                     }
                 )
 
-                with self.tracer.start_as_current_span(f"{source.name}:{name}") as current_span:
+                with self.tracer.start_as_current_span(f"{source.name}:{name}", start_time=start_time) as current_span:
                     current_span.set_attribute("source_name", source.name)
                     current_span.set_attribute("event_name", name)
                     current_span.set_attribute("data", log_data)
